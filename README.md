@@ -27,6 +27,31 @@
 
 ---
 
+## 🔖 Fork 说明
+
+本 fork 仓库地址：[fy0/gpt_image_playground](https://github.com/fy0/gpt_image_playground)，上游项目为 [CookSleep/gpt_image_playground](https://github.com/CookSleep/gpt_image_playground)。
+
+本 fork 保留上游 MIT License 与作者署名。相对上游 `v0.6.2`，本分支的核心变更是 **Docker 后端任务保持连接模式**：
+
+- 新增容器内 Node 后端，图片请求会先提交为后端任务，再由后端继续请求上游并缓存任务状态。
+- 浏览器刷新、网络短暂中断或前端页面重开后，前端可以继续轮询同一个后端任务结果，避免长时间生图请求因为页面连接断开而丢失。
+- 开启 `ENABLE_BACKEND_TASKS=true` 后，真实上游地址只读取服务端 `API_PROXY_URL`，前端用户只需要填写 API Key，适合多人使用或不希望暴露上游地址的自托管场景。
+
+上游官方镜像 `ghcr.io/cooksleep/gpt_image_playground:latest` 不包含该后端任务增强。需要使用本 fork 时，请使用本仓库 GHCR 镜像，或从本仓库源码自行构建镜像。
+
+**Docker 推荐配置：**
+
+将 `API_PROXY_URL` 设为真实上游地址，并开启 `ENABLE_BACKEND_TASKS=true`。例如：
+
+```bash
+-e ENABLE_BACKEND_TASKS=true
+-e API_PROXY_URL=http://10.0.0.2:5003/v1
+```
+
+此时前端 API URL 与 API 代理选项不会影响实际请求目标。
+
+---
+
 ## ❤️ 赞助商
 
 <table>
@@ -227,9 +252,8 @@ $env:VITE_DEFAULT_API_URL="https://api.openai.com/v1"; npm run deploy:cf
 
 ```bash
 docker run -d -p 8080:80 \
-  -e DEFAULT_API_URL=https://api.openai.com/v1 \
-  -e API_PROXY_URL=https://api.openai.com/v1 \
   -e ENABLE_BACKEND_TASKS=true \
+  -e API_PROXY_URL=http://10.0.0.2:5003/v1 \
   ghcr.io/cooksleep/gpt_image_playground:latest
 ```
 
