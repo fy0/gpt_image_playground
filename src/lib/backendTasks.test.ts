@@ -23,7 +23,10 @@ describe('backendTasks', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/backend-api/image-tasks',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        cache: 'no-store',
+      }),
     )
   })
 
@@ -37,7 +40,10 @@ describe('backendTasks', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/backend-api/image-tasks/task-1',
-      expect.objectContaining({ method: 'GET' }),
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+      }),
     )
   })
 })
