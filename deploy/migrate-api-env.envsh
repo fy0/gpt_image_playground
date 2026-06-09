@@ -10,7 +10,13 @@ if [ "${DEFAULT_API_URL+x}" != "x" ]; then
     DEFAULT_API_URL=${API_URL:-https://api.openai.com/v1}
 fi
 API_PROXY_URL=${API_PROXY_URL:-${API_URL:-https://api.openai.com/v1}}
+if [ "$ENABLE_BACKEND_TASKS" = "true" ]; then
+    ENABLE_API_PROXY=true
+    LOCK_API_PROXY=true
+fi
 
 export DEFAULT_API_URL
 export API_PROXY_URL
+export ENABLE_API_PROXY
+export LOCK_API_PROXY
 export DOCKER_LEGACY_API_URL_USED

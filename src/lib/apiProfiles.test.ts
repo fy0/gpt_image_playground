@@ -39,6 +39,16 @@ describe('validateApiProfile', () => {
       apiProxy: true,
     }))).toBe('缺少 API URL')
   })
+
+  it('allows empty API URL when backend tasks are enabled', () => {
+    vi.stubEnv('VITE_BACKEND_TASKS_ENABLED', 'true')
+
+    expect(validateApiProfile(createDefaultOpenAIProfile({
+      baseUrl: '',
+      apiKey: 'test-key',
+      apiProxy: false,
+    }))).toBeNull()
+  })
 })
 
 describe('mergeImportedSettings', () => {

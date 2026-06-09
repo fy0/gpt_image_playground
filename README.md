@@ -200,16 +200,19 @@ $env:VITE_DEFAULT_API_URL="https://api.openai.com/v1"; npm run deploy:cf
 **环境变量说明：**
 
 - `DEFAULT_API_URL`：设置页面上默认显示的 API 地址（如 `https://api.openai.com/v1`）。也支持填写 `.json` 配置 URL 或带 `settings` 参数的分享 URL 来导入自定义服务商配置（详见下方说明）。
-- `API_PROXY_URL`：配置内置代理实际转发到的完整 API 基础地址（仅开启代理时有效）。代理不会自动补 `/v1`，OpenAI 兼容接口通常必须填写到版本前缀，如 `https://api.openai.com/v1`。
-- `ENABLE_API_PROXY`：设为 `true` 开启容器内置 Nginx 同源代理，用于解决浏览器跨域（CORS）限制。开启后，前端 **API 代理** 开关默认开启，浏览器会请求同源的 `/api-proxy/{接口相对路径}`，再由 Nginx 拼接到 `API_PROXY_URL` 后转发；用户仍可在设置中手动关闭。
+- `API_PROXY_URL`：配置服务端实际转发到的完整 API 基础地址。OpenAI 兼容接口通常必须填写到版本前缀，如 `https://api.openai.com/v1`。
+- `ENABLE_BACKEND_TASKS`：设为 `true` 后启用后端保持连接。内置 OpenAI 兼容图片请求会先提交到容器后端，后端继续请求上游并保存任务状态；用户刷新页面或网络临时中断后，前端会继续查询同一个后端任务。启用后，前端 API URL 和 API 代理开关都会失效，实际请求目标只由服务端 `API_PROXY_URL` 决定，用户只需要填写 API Key。同步自定义服务商会被强制走同源代理；fal.ai 与自定义异步服务商继续使用各自队列/轮询恢复机制。
+- `ENABLE_API_PROXY`：设为 `true` 开启容器同源代理，用于解决浏览器跨域（CORS）限制。开启后，前端 **API 代理** 开关默认开启，浏览器会请求同源的 `/api-proxy/{接口相对路径}`，再由服务端拼接到 `API_PROXY_URL` 后转发；用户仍可在设置中手动关闭。
 - `LOCK_API_PROXY`：设为 `true` 时，在 `ENABLE_API_PROXY=true` 的前提下将前端 **API 代理** 开关强制锁定为开启，用户无法关闭。
-- `HOST` / `PORT`：指定容器内 Nginx 监听的地址和端口（默认 `0.0.0.0:80`）。
+- `HOST` / `PORT`：指定容器内服务监听的地址和端口（默认 `0.0.0.0:80`）。
 
 > ⚠️ **安全警告**：开启 API 代理后，任何人都能将你的服务器作为代理来请求目标 API。建议仅在有访问控制（如 IP 白名单）或本地网络中开启。
 
 > 💡 **导入自定义服务商配置**：`DEFAULT_API_URL` 除了填写普通 API 地址外，也支持直接填写 `.json` 配置 URL 或带 `settings` 参数的分享 URL。设为配置 URL 时，页面启动后会自动导入其中的自定义服务商和 API 配置，设置页显示的是配置 JSON 中 profile 定义的 `baseUrl`（而非配置 URL 本身）。
 
-> 💡 **隐藏真实 API 地址**：如果不希望用户在前端看到真实的 API 上游地址，可以配合 `ENABLE_API_PROXY=true` 和 `LOCK_API_PROXY=true` 强制所有请求走服务器代理，再将 `API_PROXY_URL` 设为真实的 API 上游地址。根据使用的服务商类型，`DEFAULT_API_URL` 的填法不同：
+> 💡 **隐藏真实 API 地址并保持连接**：如果不希望用户在前端看到真实的 API 上游地址，并希望刷新后继续等待同一个请求，推荐设置 `ENABLE_BACKEND_TASKS=true`，再将 `API_PROXY_URL` 设为真实的 API 上游地址。前端 API URL 与 API 代理选项会被锁定为无效。
+>
+> 如果只需要隐藏地址、不需要后端任务保持连接，也可以配合 `ENABLE_API_PROXY=true` 和 `LOCK_API_PROXY=true` 强制所有请求走服务器代理。根据使用的服务商类型，`DEFAULT_API_URL` 的填法不同：
 >
 > - **OpenAI 兼容接口**：将 `DEFAULT_API_URL` 留空或填写一个占位地址（如 `https://proxy`）。
 > - **自定义服务商配置**：将 `DEFAULT_API_URL` 设为配置 URL（`.json` 或带 `settings` 参数的分享 URL），配置 JSON 中 profile 的 `baseUrl` 留空或填占位地址，并设置 `apiProxy:true`。
@@ -225,24 +228,22 @@ $env:VITE_DEFAULT_API_URL="https://api.openai.com/v1"; npm run deploy:cf
 ```bash
 docker run -d -p 8080:80 \
   -e DEFAULT_API_URL=https://api.openai.com/v1 \
-  -e ENABLE_API_PROXY=true \
-  -e LOCK_API_PROXY=true \
   -e API_PROXY_URL=https://api.openai.com/v1 \
+  -e ENABLE_BACKEND_TASKS=true \
   ghcr.io/cooksleep/gpt_image_playground:latest
 ```
 
-**隐藏真实 API 地址示例（OpenAI 兼容接口）：**
+**隐藏真实 API 地址并保持连接示例（OpenAI 兼容接口）：**
 
 ```bash
 docker run -d -p 8080:80 \
   -e DEFAULT_API_URL= \
   -e API_PROXY_URL=https://real-api.example.com/v1 \
-  -e ENABLE_API_PROXY=true \
-  -e LOCK_API_PROXY=true \
+  -e ENABLE_BACKEND_TASKS=true \
   ghcr.io/cooksleep/gpt_image_playground:latest
 ```
 
-> 上例中设置页的 API URL 为空，实际请求通过代理转发到 `API_PROXY_URL`。
+> 上例中用户只需要填写 API Key；设置页的 API URL 与 API 代理选项不会影响实际请求，真实上游地址只读取服务端 `API_PROXY_URL`。
 
 **隐藏真实 API 地址示例（同步自定义服务商配置）：**
 

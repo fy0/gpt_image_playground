@@ -84,6 +84,19 @@ vi.mock('./lib/falAiImageApi', () => ({
     revisedPrompts: [],
   })),
 }))
+vi.mock('./lib/backendTasks', () => ({
+  submitBackendImageTask: vi.fn(async () => ({
+    taskId: 'backend-task-id',
+    status: 'queued',
+  })),
+  getBackendImageTask: vi.fn(async () => ({
+    taskId: 'backend-task-id',
+    status: 'running',
+  })),
+}))
+vi.mock('./lib/devProxy', () => ({
+  isBackendTasksEnabled: vi.fn(() => false),
+}))
 vi.mock('./lib/transparentImage', () => ({
   GREEN_KEY_COLOR: '#00FF00',
   MAGENTA_KEY_COLOR: '#FF00FF',
@@ -121,6 +134,8 @@ vi.mock('./lib/agentApi', () => ({
 }))
 import { clearAgentConversations, clearImages, clearTasks, getAllAgentConversations, getAllTasks, getImage, putAgentConversation, putImage, putTask as putDbTask } from './lib/db'
 import { callAgentResponsesApi, callBatchImageSingle } from './lib/agentApi'
+import { getBackendImageTask, submitBackendImageTask } from './lib/backendTasks'
+import { isBackendTasksEnabled } from './lib/devProxy'
 import { getFalQueuedImageResult } from './lib/falAiImageApi'
 import { removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
 import { cleanStaleAgentInputDrafts, clearFailedTasks, deleteAgentRoundFromConversation, deleteFavoriteCollection, editOutputs, getActiveAgentRounds, getErrorToastMessage, getPersistedState, getTaskApiProfile, importData, initStore, markInterruptedOpenAIRunningTasks, migratePersistedState, regenerateAgentAssistantMessage, remapAgentRoundMentionsForPathChange, removeTask, reuseConfig, submitAgentMessage, submitTask, useStore } from './store'
@@ -665,6 +680,9 @@ describe('fal task recovery', () => {
     await clearTasks()
     await clearImages()
     vi.mocked(getFalQueuedImageResult).mockClear()
+    vi.mocked(getBackendImageTask).mockClear()
+    vi.mocked(submitBackendImageTask).mockClear()
+    vi.mocked(isBackendTasksEnabled).mockReturnValue(false)
     vi.mocked(removeKeyedBackgroundFromDataUrl).mockClear()
     const falProfile = createDefaultFalProfile({ id: 'fal-profile', apiKey: 'fal-key' })
     useStore.setState({
@@ -728,6 +746,53 @@ describe('fal task recovery', () => {
     const originalImage = await getImage(recovered!.transparentOriginalImages![0])
     expect(outputImage?.dataUrl).toBe('transparent:data:image/png;base64,fal-recovered')
     expect(originalImage?.dataUrl).toBe('data:image/png;base64,fal-recovered')
+  })
+
+  it('shows backend task errors after recovery polling fails', async () => {
+    const openaiProfile = createDefaultOpenAIProfile({ id: 'openai-profile', apiKey: 'openai-key' })
+    const backendTask = task({
+      id: 'backend-failed-task',
+      apiProvider: 'openai',
+      apiProfileId: openaiProfile.id,
+      apiProfileName: openaiProfile.name,
+      apiModel: openaiProfile.model,
+      status: 'running',
+      error: null,
+      backendTaskId: 'backend-task-id',
+      backendRecoverable: true,
+      finishedAt: null,
+      elapsed: null,
+    })
+    await putDbTask(backendTask)
+    vi.mocked(getBackendImageTask).mockResolvedValueOnce({
+      taskId: 'backend-task-id',
+      status: 'error',
+      error: 'unknown parameter: response_format',
+    })
+    useStore.setState({
+      settings: normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        profiles: [openaiProfile],
+        activeProfileId: openaiProfile.id,
+      }),
+      tasks: [],
+      detailTaskId: null,
+      showToast: vi.fn(),
+    })
+
+    await initStore()
+    for (let i = 0; i < 5; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+
+    const recovered = useStore.getState().tasks.find((item) => item.id === backendTask.id)
+    expect(recovered).toMatchObject({
+      status: 'error',
+      error: 'unknown parameter: response_format',
+      backendRecoverable: false,
+    })
+    expect(useStore.getState().detailTaskId).toBe(backendTask.id)
+    expect(useStore.getState().showToast).toHaveBeenCalledWith('后端任务失败：unknown parameter: response_format', 'error')
   })
 })
 
