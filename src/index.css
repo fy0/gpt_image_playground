@@ -377,11 +377,13 @@ input[type="number"] {
 
 .safe-area-x {
   padding-left: max(1rem, var(--safe-area-left));
-  padding-right: max(1rem, calc(var(--safe-area-right) + var(--embed-left-offset)));
+  padding-right: max(1rem, var(--safe-area-right));
 }
 
-.embed-left-offset-center {
-  left: calc(50% - var(--embed-left-offset));
+@media (min-width: 640px) {
+  .embed-header-offset {
+    margin-right: var(--embed-left-offset);
+  }
 }
 
 .safe-area-top {

@@ -227,7 +227,7 @@ export default function Header() {
               Agent
             </button>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="embed-header-offset flex items-center gap-1 shrink-0">
             {!isPwaInstalled && (
               <div
                 className="relative"
