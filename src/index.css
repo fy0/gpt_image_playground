@@ -22,6 +22,7 @@
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
+  --embed-left-offset: 0px;
   scrollbar-gutter: stable;
 }
 
@@ -376,7 +377,11 @@ input[type="number"] {
 
 .safe-area-x {
   padding-left: max(1rem, var(--safe-area-left));
-  padding-right: max(1rem, var(--safe-area-right));
+  padding-right: max(1rem, calc(var(--safe-area-right) + var(--embed-left-offset)));
+}
+
+.embed-left-offset-center {
+  left: calc(50% - var(--embed-left-offset));
 }
 
 .safe-area-top {

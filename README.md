@@ -385,6 +385,10 @@ npm run build
 https://gpt-image-playground.cooksleep.dev?apiUrl={address}&apiKey={key}&model={model}
 ```
 
+**iframe 嵌入布局参数**
+如果宿主页面右侧有浮层遮挡，可以追加 `embedLeft` 让应用内容向左避让：
+- `?embedLeft=80`：右侧预留 80px，并将底部输入栏等居中固定控件左移 80px。单位为 px，可省略；最大 320。
+
 **方式二：自定义格式服务商**
 如果需要导入自定义格式的 API 配置，请使用 `settings` 参数并传入 URL 编码后的完整 JSON：
 - `?settings={URL编码后的JSON}`（只读取 `customProviders` 和 `profiles` 列表）

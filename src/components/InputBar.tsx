@@ -1943,7 +1943,7 @@ export default function InputBar() {
         />
       )}
 
-      <div data-input-bar className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-4xl px-3 sm:px-4 transition-all duration-300">
+      <div data-input-bar className="fixed bottom-4 sm:bottom-6 left-1/2 embed-left-offset-center -translate-x-1/2 z-30 w-full max-w-4xl px-3 sm:px-4 transition-all duration-300">
         <InputBatchBars
           showFavoriteCollectionBatchBar={showFavoriteCollectionBatchBar}
           showTaskBatchBar={showTaskBatchBar}

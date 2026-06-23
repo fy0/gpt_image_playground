@@ -6,8 +6,10 @@ import 'streamdown/styles.css'
 import 'katex/dist/katex.min.css'
 import './index.css'
 import { installMobileViewportGuards } from './lib/viewport'
+import { applyEmbedLayoutParams } from './lib/embedLayout'
 
 installMobileViewportGuards()
+applyEmbedLayoutParams()
 
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
