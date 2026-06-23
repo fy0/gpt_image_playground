@@ -11,6 +11,24 @@ const PUBLIC_DIR = resolve(process.env.PUBLIC_DIR || fileURLToPath(new URL('../d
 const TASK_RETENTION_MS = Number(process.env.BACKEND_TASK_RETENTION_MS || 6 * 60 * 60 * 1000)
 const MAX_REQUEST_BYTES = Number(process.env.BACKEND_MAX_REQUEST_BYTES || 600 * 1024 * 1024)
 const CLEANUP_INTERVAL_MS = Math.min(TASK_RETENTION_MS, 10 * 60 * 1000)
+const ERROR_LOG_BODY_LIMIT = getPositiveNumber(process.env.BACKEND_ERROR_BODY_LOG_BYTES, 4000)
+const ERROR_LOG_STACK_LINES = getPositiveNumber(process.env.BACKEND_ERROR_STACK_LINES, 12)
+const ERROR_LOG_META_KEY = Symbol('errorLogMeta')
+const SENSITIVE_QUERY_KEYS = new Set([
+  'api_key',
+  'apikey',
+  'key',
+  'token',
+  'access_token',
+  'refresh_token',
+  'authorization',
+  'auth',
+  'client_secret',
+  'secret',
+  'signature',
+  'sig',
+  'password',
+])
 const tasks = new Map()
 
 if (!UPSTREAM_BASE_URL) {
@@ -54,9 +72,159 @@ function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function logServerError(scope, error, details = '') {
+function getPositiveNumber(value, fallback) {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : fallback
+}
+
+function sanitizeLogText(value) {
+  return String(value)
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
+    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|signature)(?:["']?\s*[:=]\s*["']?))[^"',&\s}]+/gi, '$1[redacted]')
+}
+
+function truncateLogText(value, limit = ERROR_LOG_BODY_LIMIT) {
+  const text = sanitizeLogText(value)
+  if (!limit || text.length <= limit) return text
+  return `${text.slice(0, limit)}... [truncated ${text.length - limit} chars]`
+}
+
+function sanitizeLogUrl(value) {
+  try {
+    const url = new URL(String(value))
+    for (const key of [...url.searchParams.keys()]) {
+      const normalized = key.toLowerCase()
+      if (SENSITIVE_QUERY_KEYS.has(normalized) || /key|token|secret|signature|password/i.test(key)) {
+        url.searchParams.set(key, '[redacted]')
+      }
+    }
+    return url.toString()
+  } catch {
+    return sanitizeLogText(value)
+  }
+}
+
+function compactLogObject(source) {
+  const result = {}
+  for (const [key, value] of Object.entries(source || {})) {
+    if (value == null || value === '') continue
+    if (Array.isArray(value)) {
+      if (value.length) result[key] = value
+      continue
+    }
+    if (typeof value === 'object') {
+      const nested = compactLogObject(value)
+      if (Object.keys(nested).length) result[key] = nested
+      continue
+    }
+    result[key] = value
+  }
+  return result
+}
+
+function withLogMeta(error, meta) {
+  const normalized = error instanceof Error ? error : new Error(String(error))
+  const existing = normalized[ERROR_LOG_META_KEY] || {}
+  Object.defineProperty(normalized, ERROR_LOG_META_KEY, {
+    value: compactLogObject({ ...existing, ...meta }),
+    configurable: true,
+  })
+  return normalized
+}
+
+function getLogMeta(error) {
+  if (!error || typeof error !== 'object') return {}
+  return error[ERROR_LOG_META_KEY] || {}
+}
+
+function setErrorSnapshotField(target, source, key) {
+  const value = source?.[key]
+  if (value == null || value === '') return
+  if (typeof value === 'string') {
+    target[key] = truncateLogText(value)
+    return
+  }
+  target[key] = value
+}
+
+function getErrorSnapshot(error) {
+  if (error instanceof Error) {
+    const snapshot = {
+      name: error.name,
+      message: truncateLogText(error.message),
+    }
+    for (const key of ['code', 'errno', 'syscall', 'hostname', 'host', 'port', 'address', 'path']) {
+      setErrorSnapshotField(snapshot, error, key)
+    }
+    if (Array.isArray(error.errors)) {
+      snapshot.errors = error.errors.slice(0, 5).map((item) => getErrorSnapshot(item))
+    }
+    return compactLogObject(snapshot)
+  }
+
+  if (error && typeof error === 'object') {
+    const snapshot = {}
+    for (const key of ['name', 'message', 'code', 'errno', 'syscall', 'hostname', 'host', 'port', 'address', 'path']) {
+      setErrorSnapshotField(snapshot, error, key)
+    }
+    if (Object.keys(snapshot).length) return compactLogObject(snapshot)
+    try {
+      return { value: truncateLogText(JSON.stringify(error)) }
+    } catch {
+      return { value: Object.prototype.toString.call(error) }
+    }
+  }
+
+  return { message: truncateLogText(String(error)) }
+}
+
+function getErrorCauses(error) {
+  const causes = []
+  const seen = new Set()
+  let current = error instanceof Error ? error.cause : error?.cause
+
+  while (current && !seen.has(current)) {
+    seen.add(current)
+    causes.push(getErrorSnapshot(current))
+    current = current instanceof Error ? current.cause : current?.cause
+  }
+
+  return causes
+}
+
+function getErrorHeadline(error) {
+  const snapshot = getErrorSnapshot(error)
+  if (snapshot.name && snapshot.name !== 'Error' && snapshot.message) return `${snapshot.name}: ${snapshot.message}`
+  return snapshot.message || String(error)
+}
+
+function formatLogJson(value) {
+  return truncateLogText(JSON.stringify(value))
+}
+
+function getErrorStackLines(error) {
+  if (!(error instanceof Error) || !error.stack || !ERROR_LOG_STACK_LINES) return []
+  return sanitizeLogText(error.stack)
+    .split('\n')
+    .slice(0, ERROR_LOG_STACK_LINES)
+    .map((line) => line.trimEnd())
+}
+
+function logServerError(scope, error, details = '', meta = {}) {
   const suffix = details ? ` ${details}` : ''
-  console.error(`[${scope}]${suffix} ${getErrorMessage(error)}`)
+  console.error(`[${scope}]${suffix} ${getErrorHeadline(error)}`)
+
+  const logMeta = compactLogObject({ ...meta, ...getLogMeta(error) })
+  if (Object.keys(logMeta).length) console.error(`[${scope}] context: ${formatLogJson(logMeta)}`)
+
+  const causes = getErrorCauses(error)
+  if (causes.length) console.error(`[${scope}] cause: ${formatLogJson(causes.length === 1 ? causes[0] : causes)}`)
+
+  const stackLines = getErrorStackLines(error)
+  if (stackLines.length) {
+    console.error(`[${scope}] stack:`)
+    for (const line of stackLines) console.error(`[${scope}]   ${line}`)
+  }
 }
 
 function readJsonBody(req) {
@@ -132,11 +300,59 @@ function bufferToDataUrl(buffer, mime) {
   return `data:${mime};base64,${Buffer.from(buffer).toString('base64')}`
 }
 
+function getHeaderSnapshot(headers) {
+  const result = {}
+  for (const key of ['content-type', 'content-length', 'retry-after', 'x-request-id', 'x-correlation-id', 'openai-processing-ms', 'cf-ray']) {
+    const value = headers.get(key)
+    if (value) result[key] = value
+  }
+  return result
+}
+
+function getUpstreamLogContext(url, context = {}) {
+  return compactLogObject({
+    url: sanitizeLogUrl(url),
+    endpointPath: context.endpointPath,
+    apiMode: context.apiMode,
+    requestType: context.requestType,
+    model: context.model,
+  })
+}
+
+async function fetchUpstream(url, init, context = {}) {
+  try {
+    return await fetch(url, init)
+  } catch (error) {
+    throw withLogMeta(error, {
+      upstream: getUpstreamLogContext(url, context),
+    })
+  }
+}
+
+function createUpstreamHttpError(response, text, context = {}) {
+  const error = new Error(readApiErrorMessage(text) || `HTTP ${response.status}`)
+  return withLogMeta(error, {
+    upstream: {
+      ...getUpstreamLogContext(response.url || context.url, context),
+      status: response.status,
+      statusText: response.statusText,
+      headers: getHeaderSnapshot(response.headers),
+      responseBody: truncateLogText(text),
+    },
+  })
+}
+
 async function fetchImageUrlAsDataUrl(url, fallbackMime) {
   if (isDataUrl(url)) return url
 
-  const response = await fetch(url, { cache: 'no-store' })
-  if (!response.ok) throw new Error(`图片 URL 下载失败：HTTP ${response.status}`)
+  const response = await fetchUpstream(url, { cache: 'no-store' }, { requestType: 'image-download' })
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw createUpstreamHttpError(response, text, {
+      url,
+      requestType: 'image-download',
+    })
+  }
 
   const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || fallbackMime
   return bufferToDataUrl(await response.arrayBuffer(), contentType)
@@ -261,6 +477,13 @@ async function callOpenAICompatible(request) {
   const isEdit = inputImageDataUrls.length > 0
   const endpointPath = getEndpointPath(profile, isEdit)
   const url = `${UPSTREAM_BASE_URL}/${endpointPath}`
+  const upstreamContext = {
+    url,
+    endpointPath,
+    apiMode: profile.apiMode === 'responses' ? 'responses' : 'images',
+    requestType: isEdit ? 'edit' : 'generation',
+    model,
+  }
   const fallbackMime = getOutputMime(params)
   const headers = createRequestHeaders(apiKey)
   let response
@@ -277,7 +500,10 @@ async function callOpenAICompatible(request) {
       .map((result) => result.value)
     if (!successfulResults.length) {
       const firstError = results.find((result) => result.status === 'rejected')
-      throw firstError?.reason || new Error('所有并发请求均失败')
+      throw withLogMeta(firstError?.reason || new Error('所有并发请求均失败'), {
+        parallelRequests: n,
+        failedRequests: results.length,
+      })
     }
     const images = successfulResults.flatMap((result) => result.images)
     return {
@@ -299,11 +525,11 @@ async function callOpenAICompatible(request) {
       tools: [createResponsesImageTool(params, profile, isEdit, request.maskDataUrl)],
       tool_choice: 'required',
     }
-    response = await fetch(url, {
+    response = await fetchUpstream(url, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    })
+    }, upstreamContext)
   } else if (isEdit) {
     const formData = new FormData()
     formData.append('model', model)
@@ -322,7 +548,7 @@ async function callOpenAICompatible(request) {
       formData.append('image[]', blob, `input-${index + 1}.${ext}`)
     })
     if (request.maskDataUrl) formData.append('mask', dataUrlToBlob(request.maskDataUrl), 'mask.png')
-    response = await fetch(url, { method: 'POST', headers, body: formData })
+    response = await fetchUpstream(url, { method: 'POST', headers, body: formData }, upstreamContext)
   } else {
     const body = {
       model,
@@ -335,16 +561,16 @@ async function callOpenAICompatible(request) {
     if (params.output_compression != null && params.output_format !== 'png') body.output_compression = params.output_compression
     if (params.n > 1) body.n = params.n
     if (profile.responseFormatB64Json) body.response_format = 'b64_json'
-    response = await fetch(url, {
+    response = await fetchUpstream(url, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    })
+    }, upstreamContext)
   }
 
   if (!response.ok) {
     const text = await response.text().catch(() => '')
-    throw new Error(readApiErrorMessage(text) || `HTTP ${response.status}`)
+    throw createUpstreamHttpError(response, text, upstreamContext)
   }
 
   const payload = await response.json()
@@ -389,7 +615,10 @@ async function runTask(task, request) {
     task.status = 'done'
   } catch (error) {
     task.error = getErrorMessage(error)
-    logServerError('image-task', error, `${task.id} failed:`)
+    logServerError('image-task', error, `${task.id} failed:`, {
+      taskId: task.id,
+      requestHash: task.requestHash,
+    })
     task.status = 'error'
   } finally {
     task.updatedAt = Date.now()
@@ -484,12 +713,12 @@ async function handleApiProxy(req, res, url) {
   }
 
   try {
-    const upstream = await fetch(targetUrl, {
+    const upstream = await fetchUpstream(targetUrl, {
       method: req.method,
       headers,
       body: req,
       duplex: 'half',
-    })
+    }, { requestType: 'api-proxy' })
     const responseHeaders = new Headers(upstream.headers)
     responseHeaders.delete('content-encoding')
     responseHeaders.delete('content-length')
