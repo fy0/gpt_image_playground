@@ -90,9 +90,11 @@ export default function DetailModal() {
   useEffect(() => {
     const count = task?.status === 'running'
       ? streamPreviewItems.length
-      : task?.outputImages?.length ?? 0
+      : task
+      ? (task.outputErrors?.length ? Math.max(task.params.n, task.outputImages.length + task.outputErrors.length) : task.outputImages.length)
+      : 0
     if (count > 0 && imageIndex >= count) setImageIndex(count - 1)
-  }, [imageIndex, streamPreviewItems.length, task?.outputImages?.length, task?.status])
+  }, [imageIndex, streamPreviewItems.length, task, task?.status])
 
   useCloseOnEscape(Boolean(task), () => setDetailTaskId(null))
   usePreventBackgroundScroll(Boolean(task), [modalRef, rawUrlsModalRef, rawResponseModalRef])
@@ -142,13 +144,40 @@ export default function DetailModal() {
     }
   }, [task])
 
-  const currentOutputImageId = task?.outputImages?.[imageIndex] || ''
-  const currentOriginalOutputImageId = task?.transparentOriginalImages?.[imageIndex] || ''
-  const currentOutputPreviewSrc = currentOutputImageId ? outputPreviewSrcs[currentOutputImageId] || '' : ''
   const maskTargetId = task?.maskTargetImageId || null
   const maskTargetSrc = maskTargetId ? imageSrcs[maskTargetId] || '' : ''
   const maskSrc = task?.maskImageId ? imageSrcs[task.maskImageId] || '' : ''
   const allInputImageIds = task?.inputImageIds ?? []
+  const outputSlots = useMemo(() => {
+    if (!task) return []
+    const outputErrors = task.outputErrors ?? []
+    if (outputErrors.length === 0) {
+      return task.outputImages.map((imageId, outputImageIndex) => ({
+        requestIndex: outputImageIndex,
+        outputImageIndex,
+        imageId,
+        error: '',
+      }))
+    }
+
+    const errorsByIndex = new Map(outputErrors.map((item) => [item.requestIndex, item.error]))
+    const requestedCount = Math.max(task.params.n, task.outputImages.length + outputErrors.length)
+    let outputImageIndex = 0
+    return Array.from({ length: requestedCount }, (_, requestIndex) => {
+      const error = errorsByIndex.get(requestIndex)
+      if (error) return { requestIndex, outputImageIndex: -1, imageId: '', error }
+      const imageId = task.outputImages[outputImageIndex] ?? ''
+      const slot = { requestIndex, outputImageIndex, imageId, error: '' }
+      outputImageIndex += 1
+      return slot
+    })
+  }, [task])
+  const currentOutputSlot = outputSlots[imageIndex]
+  const currentOutputImageId = currentOutputSlot?.imageId || ''
+  const currentOutputImageIndex = currentOutputSlot?.outputImageIndex ?? -1
+  const currentOutputError = currentOutputSlot?.error || ''
+  const currentOriginalOutputImageId = currentOutputImageIndex >= 0 ? task?.transparentOriginalImages?.[currentOutputImageIndex] || '' : ''
+  const currentOutputPreviewSrc = currentOutputImageId ? outputPreviewSrcs[currentOutputImageId] || '' : ''
 
   useEffect(() => {
     const outputImageIds = task?.outputImages ?? []
@@ -205,10 +234,15 @@ export default function DetailModal() {
   const isAgentEditTool = task.status === 'done' && String(task.agentToolAction ?? '').toLowerCase() === 'edit'
   const showReferenceSection = allInputImageIds.length > 0 || isAgentEditTool
 
-  const outputLen = task.outputImages?.length || 0
+  const outputLen = outputSlots.length
   const currentImageRatio = currentOutputImageId ? imageRatios[currentOutputImageId] : ''
   const currentImageSize = currentOutputImageId ? imageSizes[currentOutputImageId] : ''
-  const currentActualParams = currentOutputImageId ? task.actualParamsByImage?.[currentOutputImageId] : undefined
+  const baseActualParams = currentOutputImageId
+    ? task.actualParamsByImage?.[currentOutputImageId] ?? task.actualParams
+    : task.actualParams
+  const currentActualParams = (baseActualParams?.size || !currentImageSize)
+    ? baseActualParams
+    : { ...(baseActualParams ?? {}), size: currentImageSize.replace('×', 'x') }
   const currentRevisedPrompt = currentOutputImageId ? task.revisedPromptByImage?.[currentOutputImageId]?.trim() : ''
   // 将 @图N 等 mention 标记和透明背景追加提示词都按实际请求内容比较，
   // 避免仅由本地请求预处理导致的不一致被当作“API 改写”。
@@ -236,7 +270,7 @@ export default function DetailModal() {
   const streamPartialImageIds = task.streamPartialImageIds ?? []
   const isPngOutput = task.params.output_format === 'png'
   const transparentOutputText = task.transparentOutput || task.params.transparent_output ? 'true' : 'false'
-  const currentTransparentOutputFailed = Boolean(currentOutputImageId && task.transparentOutput && task.transparentOriginalImages?.[imageIndex] === '')
+  const currentTransparentOutputFailed = Boolean(currentOutputImageId && task.transparentOutput && task.transparentOriginalImages?.[currentOutputImageIndex] === '')
   const outputCompressionText = task.params.output_compression == null ? '未设置' : String(task.params.output_compression)
 
   const formatTime = (ts: number | null) => {
@@ -427,26 +461,28 @@ export default function DetailModal() {
 
         {/* 左侧：图片 */}
         <div className="md:w-1/2 w-full h-64 md:h-auto bg-gray-100 dark:bg-black/20 relative flex items-center justify-center flex-shrink-0 min-h-[16rem]">
-          {task.status === 'done' && outputLen > 0 && (
+          {task.status === 'done' && outputLen > 0 && (currentOutputImageId || task.outputImages.length > 0) && (
             <div className="absolute right-3 top-[15px] z-20 flex items-center gap-1.5">
-              <div className="relative group flex">
-                <button
-                  type="button"
-                  {...downloadImageTooltip.handlers}
-                  onClick={(e) => {
-                    downloadImageTooltip.handlers.onClick()
-                    handleDownloadCurrentOutput(e)
-                  }}
-                    className="flex items-center justify-center px-1.5 py-0.5 bg-black/50 text-white rounded backdrop-blur-sm hover:bg-black/70 transition focus:outline-none focus:ring-1 focus:ring-white/50"
-                  aria-label="下载图片"
-                >
-                  <DownloadIcon className="h-4 w-4" />
-                </button>
-                <ViewportTooltip visible={downloadImageTooltip.visible} className="whitespace-nowrap">
-                  下载图片
-                </ViewportTooltip>
-              </div>
-              {outputLen > 1 && (
+              {currentOutputImageId && (
+                <div className="relative group flex">
+                  <button
+                    type="button"
+                    {...downloadImageTooltip.handlers}
+                    onClick={(e) => {
+                      downloadImageTooltip.handlers.onClick()
+                      handleDownloadCurrentOutput(e)
+                    }}
+                      className="flex items-center justify-center px-1.5 py-0.5 bg-black/50 text-white rounded backdrop-blur-sm hover:bg-black/70 transition focus:outline-none focus:ring-1 focus:ring-white/50"
+                    aria-label="下载图片"
+                  >
+                    <DownloadIcon className="h-4 w-4" />
+                  </button>
+                  <ViewportTooltip visible={downloadImageTooltip.visible} className="whitespace-nowrap">
+                    下载图片
+                  </ViewportTooltip>
+                </div>
+              )}
+              {task.outputImages.length > 1 && (
                 <div className="relative group flex">
                   <button
                     type="button"
@@ -488,7 +524,7 @@ export default function DetailModal() {
                   }
                 }}
                 onClick={() =>
-                  setLightboxImageId(task.outputImages[imageIndex], task.outputImages)
+                  setLightboxImageId(currentOutputImageId, task.outputImages)
                 }
                 alt=""
               />
@@ -563,6 +599,47 @@ export default function DetailModal() {
                 </div>
               )}
             </>
+          )}
+          {task.status === 'done' && outputLen > 0 && currentOutputError && (
+            <div className="w-full max-w-md px-4 text-center">
+              <svg className="w-10 h-10 text-red-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium text-red-500">第 {currentOutputSlot.requestIndex + 1} 张生成失败</p>
+              <p
+                className="mt-2 overflow-hidden whitespace-pre-line text-sm leading-6 text-red-500 break-words"
+                style={{
+                  display: '-webkit-box',
+                  WebkitBoxOrient: 'vertical',
+                  WebkitLineClamp: 8,
+                }}
+              >
+                {currentOutputError}
+              </p>
+              {outputLen > 1 && (
+                <>
+                  <button
+                    onClick={() => setImageIndex((imageIndex - 1 + outputLen) % outputLen)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 text-white hover:bg-black/50 transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setImageIndex((imageIndex + 1) % outputLen)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/30 text-white hover:bg-black/50 transition"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+                    {imageIndex + 1} / {outputLen}
+                  </span>
+                </>
+              )}
+            </div>
           )}
           {(task.status === 'running' || isReconnecting) && (
             <>
@@ -885,57 +962,73 @@ export default function DetailModal() {
               参数配置
             </h3>
             {showSourceInfo && (
-              <div className="mb-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]">
+              <div className="mb-2 min-w-0 overflow-hidden rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]">
                 <span className="text-gray-400 dark:text-gray-500">来源</span>
                 <br />
-                <span className="font-medium text-gray-700 dark:text-gray-200">{taskProviderName}</span>
-                <span className="text-gray-400 dark:text-gray-500"> · {taskProfileName} · {taskModel}</span>
+                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                  <span className="font-medium text-gray-700 dark:text-gray-200">{taskProviderName}</span>
+                  <span className="text-gray-400 dark:text-gray-500"> · {taskProfileName} · {taskModel}</span>
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+            <div className="grid grid-cols-2 gap-2 text-xs mb-4 min-w-0">
+              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">尺寸</span>
                 <br />
-                <DetailParamValue task={task} paramKey="size" className="font-medium" actualParams={currentActualParams} />
+                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                  <DetailParamValue task={task} paramKey="size" className="font-medium" actualParams={currentActualParams} />
+                </div>
               </div>
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">质量</span>
                 <br />
-                <DetailParamValue task={task} paramKey="quality" className="font-medium" actualParams={currentActualParams} />
+                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                  <DetailParamValue task={task} paramKey="quality" className="font-medium" actualParams={currentActualParams} />
+                </div>
               </div>
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">格式</span>
                 <br />
-                <DetailParamValue task={task} paramKey="output_format" className="font-medium" actualParams={currentActualParams} />
+                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                  <DetailParamValue task={task} paramKey="output_format" className="font-medium" actualParams={currentActualParams} />
+                </div>
               </div>
               {isPngOutput ? (
-                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                   <span className="text-gray-400 dark:text-gray-500">透明背景</span>
                   <br />
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{transparentOutputText}</span>
-                  {currentTransparentOutputFailed && (
-                    <span className="ml-1.5 rounded bg-red-50 px-1 py-0.5 text-[10px] font-medium uppercase leading-none text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                      failed
-                    </span>
-                  )}
+                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{transparentOutputText}</span>
+                    {currentTransparentOutputFailed && (
+                      <span className="ml-1.5 rounded bg-red-50 px-1 py-0.5 text-[10px] font-medium uppercase leading-none text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                        failed
+                      </span>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                   <span className="text-gray-400 dark:text-gray-500">压缩率</span>
                   <br />
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{outputCompressionText}</span>
+                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{outputCompressionText}</span>
+                  </div>
                 </div>
               )}
-              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+              <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                 <span className="text-gray-400 dark:text-gray-500">审核</span>
                 <br />
-                <DetailParamValue task={task} paramKey="moderation" className="font-medium" actualParams={currentActualParams} />
+                <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                  <DetailParamValue task={task} paramKey="moderation" className="font-medium" actualParams={currentActualParams} />
+                </div>
               </div>
               {!isAgentTask && (
-                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2">
+                <div className="bg-gray-50 dark:bg-white/[0.03] rounded-lg px-3 py-2 min-w-0 overflow-hidden">
                   <span className="text-gray-400 dark:text-gray-500">数量</span>
                   <br />
-                  <DetailParamValue task={task} paramKey="n" className="font-medium" />
+                  <div className="mt-0.5 overflow-x-auto hide-scrollbar whitespace-nowrap mask-edge-r pr-2">
+                    <DetailParamValue task={task} paramKey="n" className="font-medium" />
+                  </div>
                 </div>
               )}
             </div>

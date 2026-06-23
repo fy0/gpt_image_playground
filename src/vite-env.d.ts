@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_BACKEND_TASKS_ENABLED?: string
   readonly VITE_DOCKER_DEPLOYMENT?: string
   readonly VITE_DOCKER_LEGACY_API_URL_USED?: string
+  readonly VITE_SHOW_DEFAULT_CONFIG_ONLY?: string
 }
 
 interface ImportMeta {

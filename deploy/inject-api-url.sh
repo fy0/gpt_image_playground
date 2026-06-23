@@ -24,6 +24,11 @@ if [ "$ENABLE_BACKEND_TASKS" = "true" ]; then
     BACKEND_TASKS_ENABLED=true
 fi
 
+DEFAULT_CONFIG_ONLY=false
+if [ "$SHOW_DEFAULT_CONFIG_ONLY" = "true" ]; then
+    DEFAULT_CONFIG_ONLY=true
+fi
+
 escape_sed_replacement() {
     printf '%s' "$1" | sed 's/[&|\\]/\\&/g'
 }
@@ -41,3 +46,4 @@ find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|__VITE_AP
 find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|__VITE_BACKEND_TASKS_ENABLED_PLACEHOLDER__|$BACKEND_TASKS_ENABLED|g" {} +
 find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|__VITE_DOCKER_DEPLOYMENT_PLACEHOLDER__|true|g" {} +
 find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|__VITE_DOCKER_LEGACY_API_URL_USED_PLACEHOLDER__|$DOCKER_LEGACY_API_URL_USED|g" {} +
+find /usr/share/nginx/html/assets -type f -name "*.js" -exec sed -i "s|__VITE_SHOW_DEFAULT_CONFIG_ONLY_PLACEHOLDER__|$DEFAULT_CONFIG_ONLY|g" {} +

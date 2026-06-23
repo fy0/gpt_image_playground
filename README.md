@@ -2,9 +2,7 @@
 
 # 🎨 GPT Image Playground
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/CookSleep/gpt_image_playground?style=flat-square&color=eab308)](https://github.com/CookSleep/gpt_image_playground/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/CookSleep/gpt_image_playground?style=flat-square&color=3b82f6)](https://github.com/CookSleep/gpt_image_playground/network/members)
-[![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE)
+![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)
 [![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
@@ -16,20 +14,18 @@
 <br>
 
 [![Vercel 在线体验](https://img.shields.io/badge/Vercel-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-black?style=for-the-badge&logo=vercel&logoColor=white)](https://gpt-image-playground.cooksleep.dev)
-&nbsp;&nbsp;&nbsp;
-[![GitHub Pages 在线体验](https://img.shields.io/badge/GitHub%20Pages-%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-222222?style=for-the-badge&logo=github&logoColor=white)](https://cooksleep.github.io/gpt_image_playground)
 
 </div>
 
 <br>
 
-> 💡 **提示**：若需调用非 HTTPS 的内网或本地 HTTP API，请使用 GitHub Pages 版本或自行部署，Vercel 部署的体验版绑定的 `.dev` 域名因安全策略通常要求接口必须为 HTTPS。
+> 💡 **提示**：若需调用非 HTTPS 的内网或本地 HTTP API，请自行部署到允许该网络环境的服务器；Vercel 部署的体验版绑定的 `.dev` 域名因安全策略通常要求接口必须为 HTTPS。
 
 ---
 
 ## 🔖 Fork 说明
 
-本 fork 仓库地址：[fy0/gpt_image_playground](https://github.com/fy0/gpt_image_playground)，上游项目为 [CookSleep/gpt_image_playground](https://github.com/CookSleep/gpt_image_playground)。
+本 fork 仓库为 `fy0/gpt_image_playground`，上游项目为 `CookSleep/gpt_image_playground`。
 
 本 fork 保留上游 MIT License 与作者署名。相对上游 `v0.6.2`，本分支的核心变更是 **Docker 后端任务保持连接模式**：
 
@@ -57,9 +53,27 @@
 <table>
 <tr>
 <td width="180" align="center" valign="middle">
-  <a href="https://www.5cookie.cc"><img src="https://github.com/user-attachments/assets/c2a1e98e-c172-49ff-b361-60bb32601daa" alt="5Cookie Code" width="150"></a>
+  <b>5Cookie Code</b>
 </td>
 <td valign="middle"><b><a href="https://www.5cookie.cc">5Cookie Code</a></b>&nbsp;是一家稳定高速的 API 中继服务提供商，为 Image-2、Claude Code、Codex 等平台或模型提供 API 中继服务。面向个人、团队和企业用户提供 AI 编码服务和 AI 生图服务。</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b>9527 CODE</b>
+</td>
+<td valign="middle"><b><a href="https://9527code.com/">9527 CODE</a></b>&nbsp;是企业级满血 AI 中转服务平台，专注提供 Claude Code、Codex 等主流模型的高稳定中转能力，为企业级 AI 使用提供稳定、合规、高效的一站式解决方案。</td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b>Code0</b>
+</td>
+<td valign="middle"><b><a href="https://code0.ai/?source=cooksleep">Code0</a></b>&nbsp;是一家稳定高速的 AI API 中转服务商，支持 gpt-image、Claude Code、Codex 等主流模型，提供即充即用的 AI 生图与编码能力，面向个人、团队与企业用户。<a href="https://gpt-image-playground.cooksleep.dev/?apiUrl=https%3A%2F%2Fcode0.ai%2Fv1&apiMode=images&profileName=Code0">点此导入配置</a></td>
+</tr>
+<tr>
+<td width="180" align="center" valign="middle">
+  <b>球球Token</b>
+</td>
+<td valign="middle"><b><a href="https://qiuqiutoken.com">球球Token</a></b>&nbsp;是一家高速稳定务实的 AI 中转服务站，支持 gpt-image-2、Codex、Claude Code 等主流模型，100% 缓存命中、文档齐备、k8s 高可用集群、多个 CN2 GIA 接入点、售后极速响应、企业开票。</td>
 </tr>
 </table>
 
@@ -146,11 +160,12 @@
 ### 🔌 多配置与服务商增强
 - **多配置管理**：支持创建并保存多个 API 配置（包含服务商、API Key、模型等），按需快速切换；支持一键复制当前配置到列表底部，并通过拖拽对配置列表与服务商列表进行自定义排序。
 - **多服务商接入**：内置 OpenAI 兼容接口（含 `Images API` 和 `Responses API`）、fal.ai（支持队列），并支持通过 JSON 导入自定义 HTTP 服务商配置（兼容同步/异步任务）。
+- **Agent 模式独立 API 配置**：支持为 Agent 模式使用原生（Response API）或混合（Response API + Image API）的独立 API 配置，解决部分服务商/模型不支持 `image_generation` 工具的问题。
 - **API 代理**：OpenAI 兼容接口与 fal.ai 均可配置自定义代理。其中 OpenAI 兼容接口可开启同源 `/api-proxy/` 代理，交由 Docker 或本地开发环境转发至真实 API，绕开浏览器 CORS 限制。
 - **Codex CLI 兼容模式**：对上游为 Codex CLI 的 API，开启后应用 Codex CLI 实际支持的参数，并将多图生成拆分为并发单图。
 - **提示词防改写**：Responses API 会始终在请求文本前加入强制指令防止提示词被改写；开启 Codex CLI 模式后，Images API 也会获得同等保护。
 - **智能诊断提示**：当检测到接口异常改写行为或缺少常规参数时，自动提示开启相应的兼容模式。
-- **习惯配置**：支持设置提交后清空输入、重启后保留历史输入、临时复用历史任务 API 配置等。
+- **习惯配置**：支持设置提交后清空输入、重启后保留历史输入、临时复用历史任务 API 配置、关闭提示词防改写等。
 
 ---
 
@@ -161,24 +176,19 @@
 <details>
 <summary><strong>▲ 方式一：Vercel 一键部署 (推荐)</strong></summary>
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FCookSleep%2Fgpt_image_playground&project-name=gpt-image-playground&repository-name=gpt-image-playground)
-
-点击上方按钮导入仓库即可，Vercel 会自动执行构建并部署静态文件。
+在 Vercel 中导入仓库后，Vercel 会自动执行构建并部署静态文件。
 
 **配置默认 API URL**：在 Vercel 项目的 **Settings → Environment Variables** 中添加 `VITE_DEFAULT_API_URL`（如 `https://api.openai.com/v1`），然后重新部署即可生效。
 
 **导入自定义服务商配置**：`VITE_DEFAULT_API_URL` 除了填写普通 API 地址外，也支持直接填写 `.json` 配置 URL 或带 `settings` 参数的分享 URL。设为配置 URL 时，页面启动后会自动导入其中的自定义服务商和 API 配置，设置页显示的是配置 JSON 中 profile 定义的 `baseUrl`（而非配置 URL 本身）。
 
+**仅展示默认配置**：设置 `VITE_SHOW_DEFAULT_CONFIG_ONLY=true` 后，如果已配置默认 API URL 或默认代理，前端会禁用“当前配置”和“服务商类型”的下拉切换，只允许使用默认配置和默认服务商类型。通过页面 URL 参数传入的配置只会覆盖当前配置字段，不会新建配置、切换服务商类型或导入自定义服务商；`VITE_DEFAULT_API_URL` 本身仍可使用配置 URL 来定义部署端默认服务商。
+
 **绑定自定义域名 (国内直连)**：Vercel 默认分配的 `.vercel.app` 域名在国内通常无法直接访问。如果你希望在国内直连访问，请在 Vercel 项目的 **Settings → Domains** 中绑定你自己的域名。
 
 **配置自动更新**：
 
-本项目已在 `vercel.json` 中关闭了默认的自动部署。若需在同步 GitHub 上游代码后自动更新 Vercel 部署：
-
-1. 在 Vercel 项目设置 **Settings -> Git** 的 **Deploy Hooks** 中创建一个名为 `Release` 的 Hook（Branch 填 `main`）并复制生成的 URL。
-2. 在你 Fork 的 GitHub 仓库设置 **Settings -> Secrets and variables -> Actions** 中，新建 Secret `VERCEL_DEPLOY_HOOK`，填入刚才的 URL。
-
-此后，每次在 GitHub 点击 **Sync fork** 同步上游，都会自动触发 Vercel 构建部署最新版。
+本项目已在 `vercel.json` 中关闭了默认的自动部署。若需自动更新 Vercel 部署，可在 Vercel 项目设置 **Settings -> Git** 的 **Deploy Hooks** 中创建 Hook，并按你的代码托管方式配置触发。
 
 </details>
 
@@ -215,12 +225,14 @@ $env:VITE_DEFAULT_API_URL="https://api.openai.com/v1"; npm run deploy:cf
 
 **导入自定义服务商配置**：`VITE_DEFAULT_API_URL` 除了填写普通 API 地址外，也支持直接填写 `.json` 配置 URL 或带 `settings` 参数的分享 URL。设为配置 URL 时，页面启动后会自动导入其中的自定义服务商和 API 配置，设置页显示的是配置 JSON 中 profile 定义的 `baseUrl`（而非配置 URL 本身）。
 
+**仅展示默认配置**：构建前设置 `VITE_SHOW_DEFAULT_CONFIG_ONLY=true` 后，如果已配置默认 API URL 或默认代理，前端会禁用“当前配置”和“服务商类型”的下拉切换。通过页面 URL 参数传入的配置只会覆盖当前配置字段，不会新建配置、切换服务商类型或导入自定义服务商；`VITE_DEFAULT_API_URL` 本身仍可使用配置 URL 来定义部署端默认服务商。
+
 </details>
 
 <details>
 <summary><strong>🐳 方式三：Docker 部署</strong></summary>
 
-官方镜像已发布至 GitHub Container Registry。Docker 部署支持在运行时注入默认配置。
+容器镜像支持在运行时注入默认配置。
 
 **环境变量说明：**
 
@@ -229,6 +241,7 @@ $env:VITE_DEFAULT_API_URL="https://api.openai.com/v1"; npm run deploy:cf
 - `ENABLE_BACKEND_TASKS`：设为 `true` 后启用后端保持连接。内置 OpenAI 兼容图片请求会先提交到容器后端，后端继续请求上游并保存任务状态；用户刷新页面或网络临时中断后，前端会继续查询同一个后端任务。启用后，前端 API URL 和 API 代理开关都会失效，实际请求目标只由服务端 `API_PROXY_URL` 决定，用户只需要填写 API Key。同步自定义服务商会被强制走同源代理；fal.ai 与自定义异步服务商继续使用各自队列/轮询恢复机制。
 - `ENABLE_API_PROXY`：设为 `true` 开启容器同源代理，用于解决浏览器跨域（CORS）限制。开启后，前端 **API 代理** 开关默认开启，浏览器会请求同源的 `/api-proxy/{接口相对路径}`，再由服务端拼接到 `API_PROXY_URL` 后转发；用户仍可在设置中手动关闭。
 - `LOCK_API_PROXY`：设为 `true` 时，在 `ENABLE_API_PROXY=true` 的前提下将前端 **API 代理** 开关强制锁定为开启，用户无法关闭。
+- `SHOW_DEFAULT_CONFIG_ONLY`：设为 `true` 后，如果已配置默认 API URL 或默认代理，前端会禁用“当前配置”和“服务商类型”的下拉切换，只允许使用默认配置和默认服务商类型。通过页面 URL 参数传入的配置只会覆盖当前配置字段，不会新建配置、切换服务商类型或导入自定义服务商；`DEFAULT_API_URL` 本身仍可使用配置 URL 来定义部署端默认服务商。
 - `HOST` / `PORT`：指定容器内服务监听的地址和端口（默认 `0.0.0.0:80`）。
 
 > ⚠️ **安全警告**：开启 API 代理后，任何人都能将你的服务器作为代理来请求目标 API。建议仅在有访问控制（如 IP 白名单）或本地网络中开启。
@@ -312,6 +325,8 @@ services:
 
 **导入自定义服务商配置**：`VITE_DEFAULT_API_URL` 除了填写普通 API 地址外，也支持直接填写 `.json` 配置 URL 或带 `settings` 参数的分享 URL。设为配置 URL 时，页面启动后会自动导入其中的自定义服务商和 API 配置，设置页显示的是配置 JSON 中 profile 定义的 `baseUrl`（而非配置 URL 本身）。
 
+**仅展示默认配置**：在 `.env.local` 中加入 `VITE_SHOW_DEFAULT_CONFIG_ONLY=true` 后，如果已配置默认 API URL 或默认代理，前端会禁用“当前配置”和“服务商类型”的下拉切换。通过页面 URL 参数传入的配置只会覆盖当前配置字段，不会新建配置、切换服务商类型或导入自定义服务商；`VITE_DEFAULT_API_URL` 本身仍可使用配置 URL 来定义部署端默认服务商。
+
 ```bash
 npm install
 npm run dev
@@ -343,7 +358,7 @@ npm run mock:api
 npm run build
 ```
 
-构建输出的文件位于 `dist/` 目录下，可将其部署至任何静态文件服务器（如普通 Nginx、GitHub Pages、Netlify 等）。
+构建输出的文件位于 `dist/` 目录下，可将其部署至任何静态文件服务器（如普通 Nginx、Netlify 等）。
 
 </details>
 
@@ -359,16 +374,15 @@ npm run build
 - `?apiKey=sk-xxxx`
 - `?apiMode=images` 或 `?apiMode=responses`（未传时默认为 `images`）
 - `?model=gpt-image-2`（未传时按 `apiMode` 使用默认模型）
+- `?profileName=我的配置`（设置配置名称，未传时默认为 `URL 参数配置`）
 - `?codexCli=true`（开启 Codex CLI 兼容模式）
+- `?streamImages=true`（开启流式传输）
+- `?streamPartialImages=2`（请求中间步骤图像数，需配合 `streamImages=true` 使用）
 
 例如，集成到 New API 的聊天系统：
 
 ```text
 https://gpt-image-playground.cooksleep.dev?apiUrl={address}&apiKey={key}&model={model}
-```
-
-```text
-https://cooksleep.github.io/gpt_image_playground?apiUrl={address}&apiKey={key}&model={model}
 ```
 
 **方式二：自定义格式服务商**

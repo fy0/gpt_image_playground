@@ -101,6 +101,10 @@ function getStringValue(source: Record<string, unknown>, key: string): string | 
   return typeof value === 'string' && value.trim() ? value : undefined
 }
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 function getNumberValue(source: Record<string, unknown>, key: string): number | undefined {
   const value = source[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
@@ -216,8 +220,8 @@ function createResponsesImageTool(
   return tool
 }
 
-function createResponsesInput(prompt: string, inputImageDataUrls: string[]): unknown {
-  const text = `${PROMPT_REWRITE_GUARD_PREFIX}\n${prompt}`
+function createResponsesInput(prompt: string, inputImageDataUrls: string[], allowPromptRewrite: boolean): unknown {
+  const text = allowPromptRewrite ? prompt : `${PROMPT_REWRITE_GUARD_PREFIX}\n${prompt}`
   if (!inputImageDataUrls.length) return text
 
   return [
@@ -513,6 +517,9 @@ async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile
   const successfulResults = results
     .filter((r): r is PromiseFulfilledResult<CallApiResult> => r.status === 'fulfilled')
     .map((r) => r.value)
+  const failedRequests = results.flatMap((r, requestIndex) =>
+    r.status === 'rejected' ? [{ requestIndex, error: getErrorMessage(r.reason) }] : [],
+  )
 
   if (successfulResults.length === 0) {
     const firstError = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
@@ -533,12 +540,19 @@ async function callImagesApiConcurrent(opts: CallApiOptions, profile: ApiProfile
     { n: images.length },
   )
 
-  return { images, actualParams, actualParamsList, revisedPrompts, ...(rawImageUrls.length ? { rawImageUrls } : {}) }
+  return {
+    images,
+    actualParams,
+    actualParamsList,
+    revisedPrompts,
+    ...(rawImageUrls.length ? { rawImageUrls } : {}),
+    ...(failedRequests.length ? { failedRequests } : {}),
+  }
 }
 
 async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
   const { prompt: originalPrompt, params, inputImageDataUrls } = opts
-  const prompt = profile.codexCli
+  const prompt = profile.codexCli && !opts.settings.allowPromptRewrite
     ? `${PROMPT_REWRITE_GUARD_PREFIX}\n${originalPrompt}`
     : originalPrompt
   const isEdit = inputImageDataUrls.length > 0
@@ -988,6 +1002,9 @@ async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile):
   const successfulResults = results
     .filter((r): r is PromiseFulfilledResult<CallApiResult> => r.status === 'fulfilled')
     .map((r) => r.value)
+  const failedRequests = results.flatMap((r, requestIndex) =>
+    r.status === 'rejected' ? [{ requestIndex, error: getErrorMessage(r.reason) }] : [],
+  )
 
   if (successfulResults.length === 0) {
     const firstError = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
@@ -1008,7 +1025,14 @@ async function callResponsesImageApi(opts: CallApiOptions, profile: ApiProfile):
     images.length === opts.params.n ? { n: opts.params.n } : { n: images.length },
   )
 
-  return { images, actualParams, actualParamsList, revisedPrompts, ...(rawImageUrls.length ? { rawImageUrls } : {}) }
+  return {
+    images,
+    actualParams,
+    actualParamsList,
+    revisedPrompts,
+    ...(rawImageUrls.length ? { rawImageUrls } : {}),
+    ...(failedRequests.length ? { failedRequests } : {}),
+  }
 }
 
 async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiProfile): Promise<CallApiResult> {
@@ -1032,7 +1056,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
 
     const body: Record<string, unknown> = {
       model: profile.model,
-      input: createResponsesInput(prompt, inputImageDataUrls),
+      input: createResponsesInput(prompt, inputImageDataUrls, opts.settings.allowPromptRewrite),
       tools: [createResponsesImageTool(params, inputImageDataUrls.length > 0, profile, opts.maskDataUrl)],
       tool_choice: 'required',
     }
